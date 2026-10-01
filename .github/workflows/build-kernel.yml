@@ -393,8 +393,16 @@ jobs:
               echo "[$old] no files (already renamed?)"
             fi
           }
-          rename_sym ipa_is_ready wlan_qca_ipa_is_ready
+          # only rename the netlink helper (safe); ipa_is_ready needs a
+          # different approach because qcacld declares it in two headers.
           rename_sym nl80211hdr_put wlan_qca_nl80211hdr_put
+
+          # make qcacld's IPA stub weak so the real ipa_fmwk implementation wins
+          ipa_file="qcacld-3.0/components/ipa/dispatcher/src/wlan_ipa_obj_mgmt_api.c"
+          if [ -f "$ipa_file" ]; then
+            sed -i 's/^bool ipa_is_ready(void)/bool __weak ipa_is_ready(void)/' "$ipa_file"
+            echo "ipa stub now weak:"; grep -n "ipa_is_ready" "$ipa_file" | head -3
+          fi
           echo "=== verify ==="
           grep -rn "wlan_qca_ipa_is_ready" --include='*.c' . | head -3
           grep -rn "wlan_qca_nl80211hdr_put" --include='*.c' . | head -3
