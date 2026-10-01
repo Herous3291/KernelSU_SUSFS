@@ -204,8 +204,12 @@ jobs:
           else
             echo "LOCALVERSION=" >> $GITHUB_ENV
           fi
-          wget https://raw.githubusercontent.com/JackA1ltman/Oneplus8_KernelSU/refs/heads/main/patches/kernel_makefile.patch
-          patch -p1 < kernel_makefile.patch
+          # kernel_makefile.patch source repo was deleted upstream (404); make it optional
+          if wget -q https://raw.githubusercontent.com/JackA1ltman/Oneplus8_KernelSU/refs/heads/main/patches/kernel_makefile.patch; then
+            patch -p1 < kernel_makefile.patch || echo "[-] kernel_makefile.patch failed to apply, continuing"
+          else
+            echo "[-] kernel_makefile.patch unavailable (upstream repo removed), skipping"
+          fi
 
       - name: Download source boot image
         if: env.BUILD_BOOT_IMG == 'true'
