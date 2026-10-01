@@ -326,6 +326,19 @@ jobs:
           key: build-kernel-${{ env.DEVICE }}${{ env.LOCALVERSION }}${{ env.UPLOADNAME }}
           max-size: 2G
 
+      - name: Debug KSU config
+        run: |
+          cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
+          echo "=== drivers/kernelsu ==="; ls -ld drivers/kernelsu; readlink -f drivers/kernelsu || true
+          echo "=== kernelsu in drivers/Kconfig ==="; grep -n "kernelsu" drivers/Kconfig || echo "MISSING_IN_KCONFIG"
+          echo "=== KSU lines in defconfig ==="; grep -cE "^CONFIG_KSU" arch/arm64/configs/${{ env.KERNEL_CONFIG }} || true
+          echo "=== generate .config ==="
+          make O=out ARCH=${{ env.ARCH }} ${{ env.KERNEL_CONFIG }} > /dev/null 2>&1 || echo "defconfig make failed"
+          echo "=== KSU/OVERLAY/KPROBES in generated .config ==="
+          grep -E "^CONFIG_(KSU|OVERLAY_FS|KPROBES=|MODULES=)" out/.config || echo "NONE_FOUND_IN_CONFIG"
+          echo "=== does the KSU Kconfig define KSU_KPROBES_HOOK? ==="
+          grep -n "KPROBES_HOOK" drivers/kernelsu/Kconfig 2>/dev/null || echo "no kernelsu/Kconfig reachable"
+
       - name: Build kernel
         run: |
           cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
