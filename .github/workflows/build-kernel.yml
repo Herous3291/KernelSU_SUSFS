@@ -294,7 +294,7 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"  >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"  >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-          echo "SUSFS_KERNEL_VERSION=$(head -n 1 $GITHUB_WORKSPACE/kernel_workspace/android-kernel/Makefile|grep 'VERSION'|awk -F '= ' '{print $2}').$(head -n 2 $GITHUB_WORKSPACE/kernel_workspace/android-kernel/Makefile|grep 'PATCHLEVEL'|awk -F '= ' '{print $2}')" >> $GITHUB_ENV
+          echo "SUSFS_KERNEL_VERSION=$(grep -m1 '^VERSION' $GITHUB_WORKSPACE/kernel_workspace/android-kernel/Makefile|awk -F'= *' '{print $2}').$(grep -m1 '^PATCHLEVEL' $GITHUB_WORKSPACE/kernel_workspace/android-kernel/Makefile|awk -F'= *' '{print $2}')" >> $GITHUB_ENV
 
       - name: Setup SUSFS For KernelSU
         if: env.ENABLE_SUSFS == 'true'
@@ -302,7 +302,7 @@ jobs:
           cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
           git clone --recursive ${{ env.SUSFS_SOURCE }} -b ${{ env.SUSFS_SOURCE_BRANCH }} susfs4ksu --depth=1
 
-          cp susfs4ksu/kernel_patches/${{ env.KERNELSU_TYPE }}/10_enable_susfs_for_ksu.patch ${{ env.KERNELSU_TYPE }}/
+          cp susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ${{ env.KERNELSU_TYPE }}/
           cp susfs4ksu/kernel_patches/50_add_susfs_in_kernel-${{ env.SUSFS_KERNEL_VERSION }}.patch ./
 
           cp susfs4ksu/kernel_patches/fs/* fs/
