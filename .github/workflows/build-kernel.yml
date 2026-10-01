@@ -380,6 +380,25 @@ jobs:
           echo "=== sucompat check ==="; grep -c "su_kps\[" sucompat.c
           echo "=== core_hook check ==="; grep -n "is_zygote_child_test" core_hook.c | head
 
+      - name: Rename qcacld duplicate symbols
+        run: |
+          cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel/drivers/staging
+          rename_sym() {
+            old="$1"; new="$2"
+            files=$(grep -rl --include='*.c' --include='*.h' -w "$old" qcacld-3.0 qca-wifi-host-cmn 2>/dev/null || true)
+            if [ -n "$files" ]; then
+              echo "[$old -> $new] files:"; echo "$files" | head -5
+              echo "$files" | xargs sed -i "s/\b$old\b/$new/g"
+            else
+              echo "[$old] no files (already renamed?)"
+            fi
+          }
+          rename_sym ipa_is_ready wlan_qca_ipa_is_ready
+          rename_sym nl80211hdr_put wlan_qca_nl80211hdr_put
+          echo "=== verify ==="
+          grep -rn "wlan_qca_ipa_is_ready" --include='*.c' . | head -3
+          grep -rn "wlan_qca_nl80211hdr_put" --include='*.c' . | head -3
+
       - name: Build kernel
         run: |
           cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
