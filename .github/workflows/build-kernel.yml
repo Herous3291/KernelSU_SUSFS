@@ -225,7 +225,14 @@ jobs:
         if: env.ENABLE_KERNELSU == 'true'
         run: |
           cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
-          curl -LSs "${{ env.KERNELSU_SETUP_SOURCE }}" | bash -s ${{ env.KERNELSU_TAG }}
+          # Use the SUSFS-integrated KernelSU-Next fork for SM8350 / kernel 5.4
+          # (upstream susfs4ksu glue patch no longer matches current KernelSU-Next layouts)
+          git clone https://github.com/renoir-cememer-test/KernelSU-Next -b v1.1.1-with-SUS-for-Kernel-5.4 ${{ env.KERNELSU_TYPE }} --depth=1
+          cd drivers
+          ln -sf "../${{ env.KERNELSU_TYPE }}/kernel" kernelsu
+          grep -q "kernelsu" Makefile || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> Makefile
+          grep -q 'source "drivers/kernelsu/Kconfig"' Kconfig || sed -i '/endmenu/i\source "drivers/kernelsu/Kconfig"' Kconfig
+          cd ..
           KSU_VERSION=$(cd ${{ env.KERNELSU_TYPE }} && expr $(/usr/bin/git rev-list --count HEAD) + 10200)
           echo "UPLOADNAME=-${{ env.KERNELSU_TYPE }}_$KSU_VERSION" >> $GITHUB_ENV
 
@@ -302,15 +309,13 @@ jobs:
           cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
           git clone --recursive ${{ env.SUSFS_SOURCE }} -b ${{ env.SUSFS_SOURCE_BRANCH }} susfs4ksu --depth=1
 
-          cp susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ${{ env.KERNELSU_TYPE }}/
+          # KernelSU-side SUSFS hooks are already present in the KernelSU-Next fork
+          # (v1.1.1-with-SUS-for-Kernel-5.4), so only the kernel-side patch is needed.
           cp susfs4ksu/kernel_patches/50_add_susfs_in_kernel-${{ env.SUSFS_KERNEL_VERSION }}.patch ./
 
           cp susfs4ksu/kernel_patches/fs/* fs/
           cp susfs4ksu/kernel_patches/include/linux/* include/linux/
 
-          cd ${{ env.KERNELSU_TYPE }}
-          patch -p1 < 10_enable_susfs_for_ksu.patch
-          cd ../
           patch -p1 < 50_add_susfs_in_kernel-$SUSFS_KERNEL_VERSION.patch
 
       - name: Setup ccache
