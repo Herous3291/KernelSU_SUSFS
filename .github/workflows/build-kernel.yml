@@ -339,10 +339,11 @@ jobs:
           echo "=== does the KSU Kconfig define KSU_KPROBES_HOOK? ==="
           grep -n "KPROBES_HOOK" drivers/kernelsu/Kconfig 2>/dev/null || echo "no kernelsu/Kconfig reachable"
 
-      - name: Patch KernelSU sucompat.c (undeclared *_kp vars)
+      - name: Fix KernelSU-Next fork source bugs
         run: |
           cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel/KernelSU-Next/kernel
-          echo "=== before ==="; grep -n "execve_kp\|su_kps\[" sucompat.c | head -20
+          # bug 1: sucompat.c uses execve_kp/newfstatat_kp/faccessat_kp/pts_unix98_lookup_kp
+          # which do not exist in that file (the real array is su_kps[4]).
           sed -i \
             -e 's/enable_kprobe(&execve_kp);/enable_kprobe(su_kps[0]);/' \
             -e 's/enable_kprobe(&newfstatat_kp);/enable_kprobe(su_kps[2]);/' \
@@ -353,7 +354,31 @@ jobs:
             -e 's/disable_kprobe(&faccessat_kp);/disable_kprobe(su_kps[1]);/' \
             -e 's/disable_kprobe(&pts_unix98_lookup_kp);/disable_kprobe(su_kps[3]);/' \
             sucompat.c
-          echo "=== after ==="; grep -n "execve_kp\|su_kps\[" sucompat.c | head -20
+          # bug 2: core_hook.c declares a variable right after the 'do_umount:' label (invalid C)
+          python3 - <<'PYEOF'
+          import sys
+          p = 'core_hook.c'
+          lines = open(p).read().split('\n')
+          try:
+              i = next(n for n, l in enumerate(lines) if l.strip() == 'do_umount:')
+              j = next(n for n, l in enumerate(lines) if 'if (!is_zygote_child_test)' in l)
+              decl = next(l for l in lines[i:j] if 'is_zygote_child_test = ksu_is_zygote' in l)
+          except StopIteration:
+              print('core_hook.c: pattern not found, already patched?')
+              sys.exit(0)
+          indent = decl[:len(decl) - len(decl.lstrip())]
+          block = [
+              indent + 'bool is_zygote_child_test;',
+              lines[i],
+              indent + '/* selinux context check moved below the label (C requires a statement after a label) */',
+              indent + 'is_zygote_child_test = ksu_is_zygote(old->security);',
+          ]
+          lines[i:j] = block
+          open(p, 'w').write('\n'.join(lines))
+          print('core_hook.c patched: declaration moved above the label')
+          PYEOF
+          echo "=== sucompat check ==="; grep -c "su_kps\[" sucompat.c
+          echo "=== core_hook check ==="; grep -n "is_zygote_child_test" core_hook.c | head
 
       - name: Build kernel
         run: |
