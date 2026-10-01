@@ -339,6 +339,22 @@ jobs:
           echo "=== does the KSU Kconfig define KSU_KPROBES_HOOK? ==="
           grep -n "KPROBES_HOOK" drivers/kernelsu/Kconfig 2>/dev/null || echo "no kernelsu/Kconfig reachable"
 
+      - name: Patch KernelSU sucompat.c (undeclared *_kp vars)
+        run: |
+          cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel/KernelSU-Next/kernel
+          echo "=== before ==="; grep -n "execve_kp\|su_kps\[" sucompat.c | head -20
+          sed -i \
+            -e 's/enable_kprobe(&execve_kp);/enable_kprobe(su_kps[0]);/' \
+            -e 's/enable_kprobe(&newfstatat_kp);/enable_kprobe(su_kps[2]);/' \
+            -e 's/enable_kprobe(&faccessat_kp);/enable_kprobe(su_kps[1]);/' \
+            -e 's/enable_kprobe(&pts_unix98_lookup_kp);/enable_kprobe(su_kps[3]);/' \
+            -e 's/disable_kprobe(&execve_kp);/disable_kprobe(su_kps[0]);/' \
+            -e 's/disable_kprobe(&newfstatat_kp);/disable_kprobe(su_kps[2]);/' \
+            -e 's/disable_kprobe(&faccessat_kp);/disable_kprobe(su_kps[1]);/' \
+            -e 's/disable_kprobe(&pts_unix98_lookup_kp);/disable_kprobe(su_kps[3]);/' \
+            sucompat.c
+          echo "=== after ==="; grep -n "execve_kp\|su_kps\[" sucompat.c | head -20
+
       - name: Build kernel
         run: |
           cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
